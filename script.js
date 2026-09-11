@@ -121,7 +121,19 @@ let idleTimer = 0;
 let duel, weather;
 let playTime = 0;
 let difficultyTier = 0;
+let garyTouches = 0;
+let jackpotSweeps = 0;
+let debrisSwept = 0;
 const HIGH_SCORE_KEY = 'sweep-duty-high-scores-v1';
+const ACHIEVEMENT_KEY = 'sweep-duty-achievements-v1';
+
+const ACHIEVEMENTS = [
+  { id:'ten-minute-shift', name:'Ten-Minute Shift', hint:'Sweep for 10 minutes straight.' },
+  { id:'garys-personal-space', name:"Gary's Personal Space", hint:'Touch Gary 5 times.' },
+  { id:'leaf-hoarder', name:'Leaf Hoarder', hint:'Let the yard reach 90% mess after sweeping.' },
+  { id:'jackpot-janitor', name:'Jackpot Janitor', hint:'Land one JACKPOT SWEEP.' },
+  { id:'lost-and-found', name:'Lost & Found', hint:'Sweep up 3 stray objects.' }
+];
 
 const LEAF_COLORS = ['#e08a2c','#c6531b','#f2b705','#8a3b12','#d9743a'];
 
@@ -174,7 +186,7 @@ function spawnLeaf(x,y){
 }
 
 function resetGame(){
-  player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false, boostTimer:0, broomBlow:0 };
+  player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false, boostTimer:0, broomBlow:0, garyTouchCooldown:0 };
   leaves = [];
   particles = [];
   debris = [];
@@ -182,6 +194,9 @@ function resetGame(){
   idleTimer = 0;
   playTime = 0;
   difficultyTier = 0;
+  garyTouches = 0;
+  jackpotSweeps = 0;
+  debrisSwept = 0;
   score = 0; totalSwept = 0; neighborVisits = 0;
   neighborVisitLimit = Math.floor(rand(6,10));
   comboCount = 0; comboTimer = 0;
@@ -191,10 +206,10 @@ function resetGame(){
   weather = { type:'sun', timer: rand(16, 26) };
   duel = { active:false, time:0, playerScore:0, garyScore:0 };
 
-  const initialCount = 42;
+  const initialCount = 32;
   for(let i=0;i<initialCount;i++) leaves.push(spawnLeaf());
   batchTotal = initialCount;
-  threshold = rand(75,99);
+  threshold = rand(50, 80);
 
   updateHUD();
 }
@@ -219,6 +234,40 @@ function renderHighScores(elementId){
   el.innerHTML = scores.length
     ? `<strong>LOCAL BESTS</strong><br>${scores.map((value, index)=>`${index + 1}. ${value.toLocaleString()}`).join(' &nbsp; ')}`
     : '<strong>LOCAL BESTS</strong><br>First shift on the books.';
+}
+
+function getUnlockedAchievements(){
+  try {
+    const unlocked = JSON.parse(localStorage.getItem(ACHIEVEMENT_KEY) || '[]');
+    return Array.isArray(unlocked) ? unlocked : [];
+  } catch (_) { return []; }
+}
+
+function unlockAchievement(id){
+  const unlocked = getUnlockedAchievements();
+  if(unlocked.includes(id)) return;
+  const achievement = ACHIEVEMENTS.find(item => item.id === id);
+  if(!achievement) return;
+  try { localStorage.setItem(ACHIEVEMENT_KEY, JSON.stringify([...unlocked, id])); } catch (_) { /* Storage may be unavailable. */ }
+  showBanner(`🏅 BADGE UNLOCKED: ${achievement.name}`);
+  playTone(880, 0.32, 'triangle', 0.18, 0, 1320);
+}
+
+function renderAchievements(){
+  const el = document.getElementById('achievementsList');
+  const unlocked = getUnlockedAchievements();
+  el.innerHTML = ACHIEVEMENTS.map(achievement => {
+    const earned = unlocked.includes(achievement.id);
+    return `<span class="badge ${earned ? 'unlocked' : 'locked'}" title="${achievement.hint}">${earned ? '🏅 ' : '🔒 '}${achievement.name}</span>`;
+  }).join('');
+}
+
+function checkAchievements(){
+  if(playTime >= 600) unlockAchievement('ten-minute-shift');
+  if(garyTouches >= 5) unlockAchievement('garys-personal-space');
+  if(totalSwept >= 20 && batchTotal > 0 && leaves.length / batchTotal >= 0.9) unlockAchievement('leaf-hoarder');
+  if(jackpotSweeps >= 1) unlockAchievement('jackpot-janitor');
+  if(debrisSwept >= 3) unlockAchievement('lost-and-found');
 }
 
 /* ---------------- Input ---------------- */
@@ -273,11 +322,18 @@ function updatePlayer(dt){
     player.y += dy * moveSpeed * dt;
   }
   player.boostTimer = Math.max(0, player.boostTimer - dt);
+  player.garyTouchCooldown = Math.max(0, player.garyTouchCooldown - dt);
   if(!(wind.active && weather.type === 'rain' && player.moving)){
     player.broomBlow = Math.max(0, player.broomBlow - 50 * dt);
   }
   player.x = Math.max(20, Math.min(W-20, player.x));
   player.y = Math.max(70, Math.min(H-20, player.y));
+  if(neighbor.active && player.garyTouchCooldown <= 0 && dist(player.x, player.y, neighbor.x, neighbor.y) < player.r + 16){
+    garyTouches++;
+    player.garyTouchCooldown = 0.9;
+    shake = 5;
+    playTone(180, 0.1, 'square', 0.1, 0, 130);
+  }
   if(player.moving){
     idleTimer = 0;
   } else {
@@ -327,6 +383,7 @@ function updateLeaves(dt){
     }
   }
   if(jackpotPop){
+    jackpotSweeps++;
     popCombo(jackpotPop.x, jackpotPop.y, 0, 0, `JACKPOT SWEEP x4! (${jackpotPop.count} leaves)`);
     shake = 8;
     playTone(880, 0.34, 'triangle', 0.2, 0, 1320);
@@ -347,7 +404,7 @@ function updateWind(dt){
   wind.timer -= dt;
   if(!wind.active && wind.timer <= 0 && totalSwept >= 12){
     wind.active = true;
-    wind.duration = 2.4;
+    wind.duration = rand(4, 8);
     wind.dx = Math.random() < 0.5 ? -1 : 1;
     const rainyGust = weather.type === 'rain';
     wind.gustLeaves = rainyGust ? 0 : Math.min(Math.floor(rand(5, 11)), Math.max(0, totalSwept));
@@ -425,6 +482,7 @@ function updateDebris(dt){
     item.y += Math.sin(item.sway) * 12 * dt;
     if(dist(player.x, player.y, item.x, item.y) < player.r + 18){
       score += item.points;
+      debrisSwept++;
       burstParticles(item.x, item.y, item.color);
       popCombo(item.x, item.y, 0, 0, `+${item.points} BONUS!`);
       showBanner(item.joke);
@@ -608,7 +666,7 @@ function triggerNeighborEvent(){
     dana.x = dana.side > 0 ? -35 : W + 35;
     dana.y = H * 0.42;
   }
-  threshold = rand(75,99);
+  threshold = rand(50, 80);
   document.title = 'Sweep Duty';
 
   if(neighborVisits >= neighborVisitLimit){
