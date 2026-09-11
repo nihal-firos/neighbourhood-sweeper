@@ -755,8 +755,6 @@ function hideBanner(){ bannerEl.classList.remove('show'); }
 function updateHUD(){
   document.getElementById('scoreNum').textContent = score;
   document.getElementById('sweptNum').textContent = totalSwept;
-  const visitsEl = document.getElementById('visits');
-  visitsEl.textContent = '🧹'.repeat(Math.min(neighborVisits,8)) + (neighborVisits>8 ? '+' : '');
 
   const cleaned = Math.max(0, batchTotal - leaves.length);
   const pct = batchTotal>0 ? Math.min(100, Math.round((cleaned/batchTotal)*100)) : 0;
@@ -857,16 +855,35 @@ function drawPlayer(){
   // body
   ctx.fillStyle = '#3f7bb0';
   ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
-  // face
-  ctx.fillStyle = '#f3ecd9';
-  ctx.beginPath(); ctx.arc(0,-2,p.r*0.62,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#2a2a2a';
-  const eyeOff = 3.5;
-  ctx.beginPath(); ctx.arc(-eyeOff,-3,1.6,0,Math.PI*2); ctx.arc(eyeOff,-3,1.6,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.arc(0,-1,4,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+    // face
+    ctx.fillStyle = '#f3ecd9';
+    ctx.beginPath(); ctx.arc(0, -2, p.r * 0.62, 0, Math.PI * 2); ctx.fill();
 
-  ctx.restore();
+    const eyeOff = 3.5;
+    const faceDir = Math.cos(p.facing) >= 0 ? 1 : -1; // which way they're generally facing
+    const lean = p.moving ? faceDir : 0; // neutral face when standing still
+
+    // eyebrows: leading brow lifts, trailing brow dips -- flips with direction
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(-eyeOff - 2, -6 + lean * 1.2);
+    ctx.lineTo(-eyeOff + 2, -6 - lean * 0.6);
+    ctx.moveTo(eyeOff - 2, -6 - lean * 0.6);
+    ctx.lineTo(eyeOff + 2, -6 + lean * 1.2);
+    ctx.stroke();
+
+    // eyes
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath(); ctx.arc(-eyeOff, -3, 1.6, 0, Math.PI * 2); ctx.arc(eyeOff, -3, 1.6, 0, Math.PI * 2); ctx.fill();
+
+    // mouth: subtle smirk that shifts toward the direction of travel
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(lean * 1.4, -1, 4, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+
+    ctx.restore();
 }
 
 function drawNeighbor(){
