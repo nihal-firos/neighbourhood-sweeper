@@ -110,25 +110,36 @@ document.getElementById('muteBtn').addEventListener('click', ()=>{
 const STATE = { START:'start', PLAYING:'playing', PAUSED:'paused', GAMEOVER:'gameover' };
 let state = STATE.START;
 
-let player, leaves, particles, neighbor, dana, wind;
+let player, leaves, particles, neighbor, dana, wind, debris;
 let score, totalSwept, neighborVisits, neighborVisitLimit;
 let batchTotal, threshold;
 let comboCount, comboTimer;
 let shake = 0;
 let lastTime = 0;
+let debrisTimer = 0;
+let idleTimer = 0;
 const HIGH_SCORE_KEY = 'sweep-duty-high-scores-v1';
 
 const LEAF_COLORS = ['#e08a2c','#c6531b','#f2b705','#8a3b12','#d9743a'];
 
-const NEIGHBOR_LINES = [
-  "MORE LEAVES FOR YOU!",
-  "This yard needs CHARACTER.",
-  "Sweeping is a personality disorder.",
-  "My tree, my rules.",
-  "You call that clean?!",
-  "Autumn waits for no one!",
-  "I raked these MYSELF, mostly.",
-  "A tidy yard is a SUSPICIOUS yard."
+const GARY_DIALOGUE = [
+  ["MORE LEAVES FOR YOU!", "My tree, my rules."],
+  ["This yard needs CHARACTER.", "A tidy yard is a SUSPICIOUS yard."],
+  ["Sweeping is a personality disorder.", "I raked these MYSELF, mostly."],
+  ["You call that clean?!", "Autumn waits for no one!"],
+  ["The leaves have accepted me as their mayor.", "I have a permit for this. It is written on a leaf."],
+  ["I've started BREEDING the tree.", "The tree says you are doing a bad job."],
+  ["I no longer sleep. I simply compost.", "This is not a yard. This is a LEAF FACTORY."]
+];
+const IDLE_TAUNTS = [
+  "Gary, from somewhere nearby: ‘Working hard, I see.’",
+  "Gary yells: ‘The leaves aren't going to ignore themselves!’",
+  "A distant Gary voice: ‘Take your time. I have MORE leaves.’"
+];
+const DEBRIS_TYPES = [
+  { type:'pizza', points:90, color:'#e08a2c', joke:'🍕 Pizza box swept. Still somehow warm.' },
+  { type:'sock', points:70, color:'#f3ecd9', joke:'🧦 Not sure how this got here.' },
+  { type:'tumbleweed', points:110, color:'#c8964b', joke:'🌾 The tumbleweed respects your commitment.' }
 ];
 
 const ENDINGS = [
@@ -150,7 +161,9 @@ function spawnLeaf(x,y){
     r: rand(6,10),
     rot: rand(0, Math.PI*2),
     color: LEAF_COLORS[Math.floor(rand(0,LEAF_COLORS.length))],
-    sway: rand(0, Math.PI*2)
+    sway: rand(0, Math.PI*2),
+    age: 0,
+    jackpot: false
   };
 }
 
@@ -158,6 +171,9 @@ function resetGame(){
   player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false };
   leaves = [];
   particles = [];
+  debris = [];
+  debrisTimer = rand(10, 18);
+  idleTimer = 0;
   score = 0; totalSwept = 0; neighborVisits = 0;
   neighborVisitLimit = Math.floor(rand(6,10));
   comboCount = 0; comboTimer = 0;
@@ -243,24 +259,50 @@ function updatePlayer(dt){
   }
   player.x = Math.max(20, Math.min(W-20, player.x));
   player.y = Math.max(70, Math.min(H-20, player.y));
+  if(player.moving){
+    idleTimer = 0;
+  } else {
+    idleTimer += dt;
+    if(idleTimer >= 8){
+      showBanner(IDLE_TAUNTS[Math.floor(rand(0, IDLE_TAUNTS.length))]);
+      playTone(230, 0.2, 'square', 0.1, 0, 180);
+      idleTimer = rand(-5, -2);
+    }
+  }
 }
 
 function updateLeaves(dt){
   const sweepRadius = player.r + 20;
+  let jackpotPop = null;
   for(let i=leaves.length-1;i>=0;i--){
     const lf = leaves[i];
     lf.sway += dt*2;
+    lf.age += dt;
     if(dist(player.x,player.y,lf.x,lf.y) < sweepRadius){
+      if(!lf.jackpot){
+        const pile = leaves.filter(candidate =>
+          !candidate.jackpot && candidate.age >= 5 && dist(lf.x, lf.y, candidate.x, candidate.y) < 58
+        );
+        if(pile.length >= 5){
+          pile.forEach(candidate => candidate.jackpot = true);
+          jackpotPop = { x:lf.x, y:lf.y, count:pile.length };
+        }
+      }
       leaves.splice(i,1);
       totalSwept++;
       comboCount++;
       comboTimer = 0.7;
-      const gained = 10 + comboCount*2;
+      const gained = (10 + comboCount*2) * (lf.jackpot ? 4 : 1);
       score += gained;
       playCollect(comboCount);
       burstParticles(lf.x, lf.y, lf.color);
       popCombo(lf.x, lf.y, gained, comboCount);
     }
+  }
+  if(jackpotPop){
+    popCombo(jackpotPop.x, jackpotPop.y, 0, 0, `JACKPOT SWEEP x4! (${jackpotPop.count} leaves)`);
+    shake = 8;
+    playTone(880, 0.34, 'triangle', 0.2, 0, 1320);
   }
   if(comboTimer>0){ comboTimer -= dt; if(comboTimer<=0) comboCount=0; }
 }
@@ -303,6 +345,43 @@ function updateWind(dt){
   }
 }
 
+function spawnDebris(){
+  const template = DEBRIS_TYPES[Math.floor(rand(0, DEBRIS_TYPES.length))];
+  const fromLeft = Math.random() < 0.5;
+  debris.push({
+    ...template,
+    x: fromLeft ? -32 : W + 32,
+    y: rand(110, H - 45),
+    vx: fromLeft ? rand(48, 82) : rand(-82, -48),
+    rot: rand(-0.4, 0.4),
+    sway: rand(0, Math.PI * 2)
+  });
+}
+
+function updateDebris(dt){
+  debrisTimer -= dt;
+  if(debrisTimer <= 0){
+    spawnDebris();
+    debrisTimer = rand(13, 24);
+  }
+  for(let i=debris.length-1;i>=0;i--){
+    const item = debris[i];
+    item.x += item.vx * dt;
+    item.sway += dt * 3;
+    item.y += Math.sin(item.sway) * 12 * dt;
+    if(dist(player.x, player.y, item.x, item.y) < player.r + 18){
+      score += item.points;
+      burstParticles(item.x, item.y, item.color);
+      popCombo(item.x, item.y, 0, 0, `+${item.points} BONUS!`);
+      showBanner(item.joke);
+      playTone(740, 0.25, 'triangle', 0.18, 0, 1080);
+      debris.splice(i, 1);
+      continue;
+    }
+    if(item.x < -50 || item.x > W + 50) debris.splice(i, 1);
+  }
+}
+
 function updateParticles(dt){
   for(let i=particles.length-1;i>=0;i--){
     const p = particles[i];
@@ -315,12 +394,12 @@ function updateParticles(dt){
 
 const comboPopEl = document.getElementById('comboPop');
 let comboPopTimer = 0;
-function popCombo(x,y,gained,combo){
+function popCombo(x,y,gained,combo,message){
   const rect = canvas.getBoundingClientRect();
   const scaleX = rect.width / W, scaleY = rect.height / H;
   comboPopEl.style.left = (x*scaleX) + 'px';
   comboPopEl.style.top = (y*scaleY) + 'px';
-  comboPopEl.textContent = combo>1 ? `+${gained} x${combo}` : `+${gained}`;
+  comboPopEl.textContent = message || (combo>1 ? `+${gained} x${combo}` : `+${gained}`);
   comboPopEl.style.opacity = '1';
   comboPopEl.style.transform = 'translate(-50%,-10px)';
   comboPopTimer = 0.001;
@@ -379,7 +458,14 @@ function updateDana(dt){
 
 function endNeighborVisit(){
   neighbor.active = false;
+  document.title = 'Sweep Duty';
   hideBanner();
+}
+
+function getGaryLine(visit){
+  const stage = Math.min(GARY_DIALOGUE.length - 1, Math.floor((visit - 1) / 2));
+  const lines = GARY_DIALOGUE[stage];
+  return lines[Math.floor(rand(0, lines.length))];
 }
 
 function triggerNeighborEvent(){
@@ -398,8 +484,9 @@ function triggerNeighborEvent(){
   neighborVisits++;
   playNeighborHorn();
   shake = 10;
-  const line = NEIGHBOR_LINES[Math.floor(rand(0,NEIGHBOR_LINES.length))];
+  const line = getGaryLine(neighborVisits);
   showBanner(`🍂 Gary is here to "help" — "${line}"`);
+  document.title = '😱 Gary incoming!';
   if(neighborVisits >= 5){
     dana.active = true;
     dana.arguing = false;
@@ -408,6 +495,7 @@ function triggerNeighborEvent(){
     dana.y = H * 0.42;
   }
   threshold = rand(75,99);
+  document.title = 'Sweep Duty';
 
   if(neighborVisits >= neighborVisitLimit){
     setTimeout(()=> triggerGameOver(), 1400);
@@ -436,7 +524,6 @@ function updateHUD(){
   fill.style.width = pct + '%';
   const hue = Math.round(120 - (pct/100)*120);
   fill.style.background = `linear-gradient(90deg, hsl(${hue+20},60%,45%), hsl(${hue},70%,55%))`;
-  document.getElementById('barLabel').textContent = pct + '% clean · threshold ' + Math.round(threshold) + '%';
 }
 
 function checkThreshold(){
@@ -532,6 +619,33 @@ function drawNeighbor(){
   ctx.restore();
 }
 
+function drawDebris(item){
+  ctx.save();
+  ctx.translate(item.x, item.y);
+  ctx.rotate(item.rot + Math.sin(item.sway) * 0.15);
+  if(item.type === 'pizza'){
+    ctx.fillStyle = '#c6531b';
+    ctx.fillRect(-14, -10, 28, 20);
+    ctx.fillStyle = '#f2b705';
+    ctx.fillRect(-10, -6, 20, 12);
+    ctx.fillStyle = '#8a3b12';
+    ctx.beginPath(); ctx.arc(-4, 0, 2.5, 0, Math.PI * 2); ctx.arc(6, 2, 2.5, 0, Math.PI * 2); ctx.fill();
+  } else if(item.type === 'sock'){
+    ctx.fillStyle = '#f3ecd9';
+    ctx.beginPath();
+    ctx.moveTo(-7,-13); ctx.lineTo(5,-13); ctx.lineTo(6,2); ctx.quadraticCurveTo(16,4,11,12);
+    ctx.lineTo(-7,12); ctx.quadraticCurveTo(-11,6,-5,2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#c9c2ae'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-6,-6); ctx.lineTo(5,-6); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#c8964b'; ctx.lineWidth = 2;
+    for(let i=0;i<5;i++){
+      ctx.beginPath(); ctx.arc(0,0, 6 + i * 2.2, i, Math.PI * 1.5 + i); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function drawDana(){
   if(!dana.active) return;
   ctx.save();
@@ -592,6 +706,7 @@ function render(){
   }
   drawTurf();
   leaves.forEach(drawLeaf);
+  debris.forEach(drawDebris);
   drawParticles();
   drawWind();
   drawPlayer();
@@ -609,6 +724,7 @@ function loop(t){
     updatePlayer(dt);
     updateLeaves(dt);
     updateParticles(dt);
+    updateDebris(dt);
     updateWind(dt);
     updateNeighbor(dt);
     updateDana(dt);
@@ -623,6 +739,7 @@ requestAnimationFrame(loop);
 /* ---------------- Flow control ---------------- */
 function triggerGameOver(){
   state = STATE.GAMEOVER;
+  document.title = 'Sweep Duty — Gary wins';
   stopMusic();
   playGameOver();
   document.getElementById('goMsg').textContent = ENDINGS[Math.floor(rand(0,ENDINGS.length))];
