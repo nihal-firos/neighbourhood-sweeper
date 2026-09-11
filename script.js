@@ -135,6 +135,16 @@ const ACHIEVEMENTS = [
   { id:'lost-and-found', name:'Lost & Found', hint:'Sweep up 3 stray objects.' }
 ];
 
+    const TREES = [
+        { fx: 0.06, fy: 0.20, scale: 1.15 },
+        { fx: 0.93, fy: 0.16, scale: 0.95 },
+        { fx: 0.03, fy: 0.80, scale: 1.3 },
+        { fx: 0.96, fy: 0.82, scale: 1.05 },
+        { fx: 0.5, fy: 0.06, scale: 0.8 },
+        { fx: 0.32, fy: 0.48, scale: 0.9 },
+        { fx: 0.68, fy: 0.55, scale: 1.0 }
+    ];
+
 const LEAF_COLORS = ['#e08a2c','#c6531b','#f2b705','#8a3b12','#d9743a'];
 
 const GARY_DIALOGUE = [
@@ -170,20 +180,36 @@ function rand(a,b){ return a + Math.random()*(b-a); }
 function dist(x1,y1,x2,y2){ return Math.hypot(x1-x2, y1-y2); }
 function difficultyFactor(){ return 1 + playTime / 180; }
 
-function spawnLeaf(x,y){
-  return {
-    x: x ?? rand(40, W-40),
-    y: y ?? rand(90, H-40),
-    r: rand(6,10),
-    rot: rand(0, Math.PI*2),
-    color: LEAF_COLORS[Math.floor(rand(0,LEAF_COLORS.length))],
-    sway: rand(0, Math.PI*2),
-    age: 0,
-    jackpot: false,
-    sweepHits: 0,
-    sweepCooldown: 0
-  };
-}
+    function spawnLeaf(x, y) {
+        let lx = x, ly = y;
+        if (lx === undefined || ly === undefined) {
+            let tries = 0;
+            do {
+                lx = rand(40, W - 40);
+                ly = rand(90, H - 40);
+                tries++;
+            } while (treeColliders().some(t => dist(lx, ly, t.x, t.y) < t.r + 14) && tries < 10);
+        }
+        return {
+            x: lx, y: ly,
+            r: rand(6, 10),
+            rot: rand(0, Math.PI * 2),
+            color: LEAF_COLORS[Math.floor(rand(0, LEAF_COLORS.length))],
+            sway: rand(0, Math.PI * 2),
+            age: 0,
+            jackpot: false,
+            sweepHits: 0,
+            sweepCooldown: 0
+        };
+    }
+
+    function treeColliders() {
+        return TREES.map(t => ({
+            x: t.fx * W,
+            y: t.fy * H + 18 * t.scale,
+            r: 20 * t.scale
+        }));
+    }
 
 function resetGame(){
   player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false, boostTimer:0, broomBlow:0, garyTouchCooldown:0 };
@@ -328,6 +354,7 @@ function updatePlayer(dt){
   }
   player.x = Math.max(20, Math.min(W-20, player.x));
   player.y = Math.max(70, Math.min(H-20, player.y));
+  resolveTreeCollisions();
   if(neighbor.active && player.garyTouchCooldown <= 0 && dist(player.x, player.y, neighbor.x, neighbor.y) < player.r + 16){
     garyTouches++;
     player.garyTouchCooldown = 0.9;
@@ -345,6 +372,20 @@ function updatePlayer(dt){
     }
   }
 }
+
+    function resolveTreeCollisions() {
+        treeColliders().forEach(tree => {
+            const dx = player.x - tree.x;
+            const dy = player.y - tree.y;
+            const d = Math.hypot(dx, dy);
+            const minDist = player.r + tree.r;
+            if (d < minDist && d > 0.001) {
+                const push = (minDist - d);
+                player.x += (dx / d) * push;
+                player.y += (dy / d) * push;
+            }
+        });
+    }
 
 function updateLeaves(dt){
   const sweepRadius = player.r + 20;
@@ -721,6 +762,32 @@ function drawTurf(){
   }
 }
 
+    function drawTree(tree) {
+        const x = tree.fx * W, y = tree.fy * H;
+        const s = tree.scale;
+        const sway = Math.sin(lastTime / 900 + tree.fx * 10) * 3;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(s, s);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(0, 46, 34, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#5b3b22';
+        ctx.fillRect(-7, 0, 14, 44);
+
+        ctx.translate(sway, 0);
+        ctx.fillStyle = '#2d4a26';
+        ctx.beginPath(); ctx.arc(0, -10, 30, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3c6130';
+        ctx.beginPath(); ctx.arc(-14, -24, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(16, -22, 24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#4d7a3d';
+        ctx.beginPath(); ctx.arc(0, -34, 20, 0, Math.PI * 2); ctx.fill();
+
+        ctx.restore();
+    }
+
 function drawLeaf(lf){
   ctx.save();
   ctx.translate(lf.x, lf.y + Math.sin(lf.sway)*1.5);
@@ -898,6 +965,7 @@ function render(){
   }
   drawTurf();
   drawWeather();
+  TREES.forEach(drawTree);
   leaves.forEach(drawLeaf);
   debris.forEach(drawDebris);
   drawParticles();
