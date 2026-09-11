@@ -679,7 +679,7 @@ function finishRakeDuel(){
   document.getElementById('duelOverlay').classList.add('hidden');
   state = STATE.PLAYING;
   document.title = 'Sweep Duty';
-  threshold = rand(50, 80);
+  threshold = rand(70, 95);
   if(duel.playerScore >= duel.garyScore){
     player.boostTimer = 12;
     showBanner('🏆 YOU WIN! Turbo sweeping for 12 seconds.');
@@ -728,7 +728,7 @@ function triggerNeighborEvent(){
   const line = getGaryLine(neighborVisits);
   showBanner(`🍂 Gary is here to "help" — "${line}"`);
   document.title = '😱 Gary incoming!';
-  if(neighborVisits >= 5){
+  if(neighborVisits >= 3){
     dana.active = true;
     dana.arguing = false;
     dana.side = fromLeft ? 1 : -1;
