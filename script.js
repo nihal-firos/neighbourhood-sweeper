@@ -262,7 +262,7 @@ function resetGame(){
   const initialCount = 32;
   for(let i=0;i<initialCount;i++) leaves.push(spawnLeaf());
   batchTotal = initialCount;
-  threshold = rand(50, 80);
+  threshold = rand(85, 99);
 
   updateHUD();
 }
@@ -624,11 +624,12 @@ function updateDana(dt){
   const targetX = neighbor.active ? neighbor.x - dana.side * 42 : (dana.side > 0 ? W + 35 : -35);
   const targetY = neighbor.active ? neighbor.y + 10 : H * 0.42;
   const d = dist(dana.x, dana.y, targetX, targetY);
-  if(d > 4){
-    dana.x += (targetX - dana.x) / d * 185 * dt;
-    dana.y += (targetY - dana.y) / d * 185 * dt;
-  }
-  if(neighbor.active && d < 50){
+    if (d > 4) {
+        const danaSpd = 200 * difficultyFactor(); // stays ~40px/s faster than Gary at any difficulty tier
+        dana.x += (targetX - dana.x) / d * danaSpd * dt;
+        dana.y += (targetY - dana.y) / d * danaSpd * dt;
+    }
+  if(neighbor.active && d < 65){
     dana.arguing = true;
     dana.argumentTimer = 2.7;
     showBanner('🗯️ Dana: “Gary, stop undoing their work!”');
@@ -679,7 +680,7 @@ function finishRakeDuel(){
   document.getElementById('duelOverlay').classList.add('hidden');
   state = STATE.PLAYING;
   document.title = 'Sweep Duty';
-  threshold = rand(70, 95);
+  threshold = rand(85, 99);
   if(duel.playerScore >= duel.garyScore){
     player.boostTimer = 12;
     showBanner('🏆 YOU WIN! Turbo sweeping for 12 seconds.');
@@ -735,7 +736,7 @@ function triggerNeighborEvent(){
         dana.x = dana.side > 0 ? -35 : W + 35;
         dana.y = H * 0.42;
     }
-  threshold = rand(50, 80);
+  threshold = rand(85, 99);
   document.title = 'Sweep Duty';
 
   if(neighborVisits >= neighborVisitLimit){
