@@ -251,7 +251,7 @@ function resetGame(){
   jackpotSweeps = 0;
   debrisSwept = 0;
   score = 0; totalSwept = 0; neighborVisits = 0;
-  neighborVisitLimit = Math.floor(rand(6,10));
+  neighborVisitLimit = Math.floor(rand(5,8));
   comboCount = 0; comboTimer = 0;
   neighbor = { active:false, x:-40, y:-40, targetIdx:0, path:[], dropTimer:0, line:'' };
   dana = { active:false, x:-40, y:-40, side:1, arguing:false, argumentTimer:0 };
