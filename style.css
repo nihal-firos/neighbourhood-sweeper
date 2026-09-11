@@ -142,6 +142,44 @@ canvas {
     display: none;
 }
 
+.duelOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+    color: var(--cream);
+    background: rgba(38, 33, 43, .92);
+}
+
+.duelOverlay.hidden { display: none; }
+
+.duelTitle { color: var(--alert); }
+
+.duelTimer {
+    margin: 0;
+    color: var(--leaf3);
+    font: 700 clamp(42px, 9vw, 84px) 'Fredoka', sans-serif;
+}
+
+.duelScores {
+    display: flex;
+    gap: 28px;
+    margin: 8px 0 22px;
+    color: var(--cream-dim);
+    font-size: 17px;
+}
+
+.duelScores strong {
+    display: block;
+    color: var(--cream);
+    font: 700 34px 'Fredoka', sans-serif;
+}
+
 .title {
     font-family: 'Fredoka', sans-serif;
     font-weight: 700;

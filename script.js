@@ -107,7 +107,7 @@ document.getElementById('muteBtn').addEventListener('click', ()=>{
 });
 
 /* ---------------- Game state ---------------- */
-const STATE = { START:'start', PLAYING:'playing', PAUSED:'paused', GAMEOVER:'gameover' };
+const STATE = { START:'start', PLAYING:'playing', DUEL:'duel', PAUSED:'paused', GAMEOVER:'gameover' };
 let state = STATE.START;
 
 let player, leaves, particles, neighbor, dana, wind, debris;
@@ -118,6 +118,9 @@ let shake = 0;
 let lastTime = 0;
 let debrisTimer = 0;
 let idleTimer = 0;
+let duel, weather;
+let playTime = 0;
+let difficultyTier = 0;
 const HIGH_SCORE_KEY = 'sweep-duty-high-scores-v1';
 
 const LEAF_COLORS = ['#e08a2c','#c6531b','#f2b705','#8a3b12','#d9743a'];
@@ -153,6 +156,7 @@ const ENDINGS = [
 
 function rand(a,b){ return a + Math.random()*(b-a); }
 function dist(x1,y1,x2,y2){ return Math.hypot(x1-x2, y1-y2); }
+function difficultyFactor(){ return 1 + playTime / 180; }
 
 function spawnLeaf(x,y){
   return {
@@ -163,23 +167,29 @@ function spawnLeaf(x,y){
     color: LEAF_COLORS[Math.floor(rand(0,LEAF_COLORS.length))],
     sway: rand(0, Math.PI*2),
     age: 0,
-    jackpot: false
+    jackpot: false,
+    sweepHits: 0,
+    sweepCooldown: 0
   };
 }
 
 function resetGame(){
-  player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false };
+  player = { x: W/2, y: H/2, r: 16, speed: 230, facing: 0, moving:false, boostTimer:0, broomBlow:0 };
   leaves = [];
   particles = [];
   debris = [];
   debrisTimer = rand(10, 18);
   idleTimer = 0;
+  playTime = 0;
+  difficultyTier = 0;
   score = 0; totalSwept = 0; neighborVisits = 0;
   neighborVisitLimit = Math.floor(rand(6,10));
   comboCount = 0; comboTimer = 0;
   neighbor = { active:false, x:-40, y:-40, targetIdx:0, path:[], dropTimer:0, line:'' };
   dana = { active:false, x:-40, y:-40, side:1, arguing:false, argumentTimer:0 };
   wind = { timer: rand(14, 22), active:false, duration:0, dx:1, gustLeaves:0 };
+  weather = { type:'sun', timer: rand(16, 26) };
+  duel = { active:false, time:0, playerScore:0, garyScore:0 };
 
   const initialCount = 42;
   for(let i=0;i<initialCount;i++) leaves.push(spawnLeaf());
@@ -215,6 +225,10 @@ function renderHighScores(elementId){
 const keys = {};
 window.addEventListener('keydown', e=>{
   keys[e.key.toLowerCase()] = true;
+  if(state === STATE.DUEL && (e.code === 'Space' || e.key === ' ')){
+    e.preventDefault();
+    mashDuel();
+  }
   if(e.key === 'Escape'){
     e.preventDefault();
     if(state === STATE.PLAYING) pauseGame();
@@ -254,8 +268,13 @@ function updatePlayer(dt){
   if(player.moving){
     dx/=len; dy/=len;
     player.facing = Math.atan2(dy,dx);
-    player.x += dx * player.speed * dt;
-    player.y += dy * player.speed * dt;
+    const moveSpeed = player.speed * (player.boostTimer > 0 ? 1.55 : 1);
+    player.x += dx * moveSpeed * dt;
+    player.y += dy * moveSpeed * dt;
+  }
+  player.boostTimer = Math.max(0, player.boostTimer - dt);
+  if(!(wind.active && weather.type === 'rain' && player.moving)){
+    player.broomBlow = Math.max(0, player.broomBlow - 50 * dt);
   }
   player.x = Math.max(20, Math.min(W-20, player.x));
   player.y = Math.max(70, Math.min(H-20, player.y));
@@ -278,7 +297,15 @@ function updateLeaves(dt){
     const lf = leaves[i];
     lf.sway += dt*2;
     lf.age += dt;
-    if(dist(player.x,player.y,lf.x,lf.y) < sweepRadius){
+    lf.sweepCooldown = Math.max(0, lf.sweepCooldown - dt);
+    if(dist(player.x,player.y,lf.x,lf.y) < sweepRadius && lf.sweepCooldown <= 0){
+      if(weather.type === 'rain' && lf.sweepHits === 0){
+        lf.sweepHits = 1;
+        lf.sweepCooldown = 0.45;
+        burstParticles(lf.x, lf.y, '#77a9c9', 5, 0.8);
+        playSweep();
+        continue;
+      }
       if(!lf.jackpot){
         const pile = leaves.filter(candidate =>
           !candidate.jackpot && candidate.age >= 5 && dist(lf.x, lf.y, candidate.x, candidate.y) < 58
@@ -295,7 +322,7 @@ function updateLeaves(dt){
       const gained = (10 + comboCount*2) * (lf.jackpot ? 4 : 1);
       score += gained;
       playCollect(comboCount);
-      burstParticles(lf.x, lf.y, lf.color);
+      burstParticles(lf.x, lf.y, lf.color, weather.type === 'sun' ? 12 : 6, weather.type === 'sun' ? 1.65 : 1);
       popCombo(lf.x, lf.y, gained, comboCount);
     }
   }
@@ -307,10 +334,10 @@ function updateLeaves(dt){
   if(comboTimer>0){ comboTimer -= dt; if(comboTimer<=0) comboCount=0; }
 }
 
-function burstParticles(x,y,color){
-  for(let i=0;i<6;i++){
+function burstParticles(x,y,color,count=6,force=1){
+  for(let i=0;i<count;i++){
     particles.push({
-      x,y, vx: rand(-90,90), vy: rand(-110,-30),
+      x,y, vx: rand(-90,90) * force, vy: rand(-110,-30) * force,
       life: rand(0.35,0.6), age:0, color
     });
   }
@@ -322,26 +349,53 @@ function updateWind(dt){
     wind.active = true;
     wind.duration = 2.4;
     wind.dx = Math.random() < 0.5 ? -1 : 1;
-    wind.gustLeaves = Math.min(Math.floor(rand(5, 11)), Math.max(0, totalSwept));
-    const pileX = Math.max(45, Math.min(W - 45, player.x - wind.dx * 85));
-    const pileY = Math.max(95, Math.min(H - 45, player.y + rand(-45, 45)));
-    for(let i=0; i<wind.gustLeaves; i++){
-      leaves.push(spawnLeaf(pileX + rand(-30, 30), pileY + rand(-22, 22)));
-      batchTotal++;
+    const rainyGust = weather.type === 'rain';
+    wind.gustLeaves = rainyGust ? 0 : Math.min(Math.floor(rand(5, 11)), Math.max(0, totalSwept));
+    if(rainyGust){
+      showBanner('💨 RAIN GUST! Keep hold of that broom.');
+    } else {
+      const pileX = Math.max(45, Math.min(W - 45, player.x - wind.dx * 85));
+      const pileY = Math.max(95, Math.min(H - 45, player.y + rand(-45, 45)));
+      for(let i=0; i<wind.gustLeaves; i++){
+        leaves.push(spawnLeaf(pileX + rand(-30, 30), pileY + rand(-22, 22)));
+        batchTotal++;
+      }
+      showBanner(`💨 WIND GUST! ${wind.gustLeaves} swept leaves are loose again.`);
     }
     playSweep();
     shake = 4;
-    showBanner(`💨 WIND GUST! ${wind.gustLeaves} swept leaves are loose again.`);
   }
   if(!wind.active) return;
   wind.duration -= dt;
-  leaves.forEach(lf => {
-    lf.x = Math.max(18, Math.min(W - 18, lf.x + wind.dx * 58 * dt));
-    lf.y += Math.sin(lf.sway * 2) * 9 * dt;
-  });
+  if(weather.type === 'rain'){
+    if(player.moving){
+      player.x = Math.max(20, Math.min(W - 20, player.x + wind.dx * 92 * dt));
+      player.broomBlow = Math.min(24, player.broomBlow + 38 * dt);
+    }
+  } else {
+    leaves.forEach(lf => {
+      lf.x = Math.max(18, Math.min(W - 18, lf.x + wind.dx * 58 * dt));
+      lf.y += Math.sin(lf.sway * 2) * 9 * dt;
+    });
+  }
   if(wind.duration <= 0){
     wind.active = false;
     wind.timer = rand(16, 27);
+  }
+}
+
+function updateWeather(dt){
+  weather.timer -= dt;
+  if(weather.timer > 0) return;
+  weather.type = weather.type === 'rain' ? 'sun' : 'rain';
+  weather.timer = rand(14, 24);
+  if(weather.type === 'rain'){
+    leaves.forEach(lf => { lf.sweepHits = 0; });
+    showBanner('🌧️ RAIN! Soggy leaves need two sweeps.');
+    playTone(280, 0.3, 'sine', 0.12, 0, 180);
+  } else {
+    showBanner('☀️ SUN! Crisp leaves burst beautifully.');
+    playTone(620, 0.2, 'triangle', 0.14, 0, 900);
   }
 }
 
@@ -415,7 +469,7 @@ function updateNeighbor(dt){
   const target = path[neighbor.targetIdx];
   if(!target){ endNeighborVisit(); return; }
   const d = dist(neighbor.x, neighbor.y, target.x, target.y);
-  const spd = 160;
+  const spd = 160 * difficultyFactor();
   if(d < 6){
     neighbor.targetIdx++;
   } else {
@@ -424,7 +478,7 @@ function updateNeighbor(dt){
   }
   neighbor.dropTimer -= dt;
   if(neighbor.dropTimer <= 0 && !dana.arguing){
-    neighbor.dropTimer = 0.12;
+    neighbor.dropTimer = 0.12 / difficultyFactor();
     const nl = spawnLeaf(neighbor.x + rand(-14,14), neighbor.y + rand(-8,20));
     leaves.push(nl);
     batchTotal++;
@@ -462,6 +516,59 @@ function endNeighborVisit(){
   hideBanner();
 }
 
+function startRakeDuel(){
+  state = STATE.DUEL;
+  duel = { active:true, time:5, playerScore:0, garyScore:0, garyTimer:0.18 };
+  document.getElementById('duelOverlay').classList.remove('hidden');
+  updateDuelHUD();
+  playNeighborHorn();
+}
+
+function mashDuel(){
+  if(state !== STATE.DUEL) return;
+  duel.playerScore++;
+  playTone(520 + Math.min(duel.playerScore, 8) * 25, 0.06, 'square', 0.08, 0);
+  updateDuelHUD();
+}
+
+function updateDuelHUD(){
+  document.getElementById('duelTimer').textContent = Math.max(0, duel.time).toFixed(1);
+  document.getElementById('duelPlayerScore').textContent = duel.playerScore;
+  document.getElementById('duelGaryScore').textContent = duel.garyScore;
+}
+
+function updateDuel(dt){
+  duel.time -= dt;
+  duel.garyTimer -= dt;
+  if(duel.garyTimer <= 0){
+    duel.garyScore += Math.random() < 0.28 ? 2 : 1;
+    duel.garyTimer = rand(0.12, 0.24);
+  }
+  updateDuelHUD();
+  if(duel.time <= 0) finishRakeDuel();
+}
+
+function finishRakeDuel(){
+  duel.active = false;
+  document.getElementById('duelOverlay').classList.add('hidden');
+  state = STATE.PLAYING;
+  document.title = 'Sweep Duty';
+  if(duel.playerScore >= duel.garyScore){
+    player.boostTimer = 12;
+    showBanner('🏆 YOU WIN! Turbo sweeping for 12 seconds.');
+    playTone(760, 0.45, 'triangle', 0.2, 0, 1280);
+  } else {
+    const dumpCount = 14;
+    for(let i=0;i<dumpCount;i++){
+      leaves.push(spawnLeaf(player.x + rand(-58,58), player.y + rand(-48,48)));
+      batchTotal++;
+    }
+    showBanner('🧹 GARY WINS! A fresh pile lands on your shoes.');
+    shake = 10;
+  }
+  if(neighborVisits >= neighborVisitLimit) setTimeout(()=> triggerGameOver(), 1400);
+}
+
 function getGaryLine(visit){
   const stage = Math.min(GARY_DIALOGUE.length - 1, Math.floor((visit - 1) / 2));
   const lines = GARY_DIALOGUE[stage];
@@ -484,6 +591,13 @@ function triggerNeighborEvent(){
   neighborVisits++;
   playNeighborHorn();
   shake = 10;
+  if(neighborVisits >= 3 && neighborVisits % 3 === 0){
+    neighbor.active = false;
+    threshold = 100;
+    document.title = '🪮 Rake-off with Gary!';
+    startRakeDuel();
+    return;
+  }
   const line = getGaryLine(neighborVisits);
   showBanner(`🍂 Gary is here to "help" — "${line}"`);
   document.title = '😱 Gary incoming!';
@@ -533,7 +647,8 @@ function checkThreshold(){
     triggerNeighborEvent();
   }
   if(leaves.length < 4){
-    for(let i=0;i<10;i++){ leaves.push(spawnLeaf()); batchTotal++; }
+    const refillCount = 10 + Math.floor(playTime / 45);
+    for(let i=0;i<refillCount;i++){ leaves.push(spawnLeaf()); batchTotal++; }
   }
 }
 
@@ -574,11 +689,11 @@ function drawPlayer(){
   ctx.beginPath(); ctx.ellipse(0, p.r*0.9, p.r*0.9, p.r*0.35, 0,0,Math.PI*2); ctx.fill();
 
   // broom (trails behind facing direction)
-  const bx = -Math.cos(p.facing) * (p.r+14);
-  const by = -Math.sin(p.facing) * (p.r+14);
+  const bx = -Math.cos(p.facing) * (p.r+14) + wind.dx * p.broomBlow;
+  const by = -Math.sin(p.facing) * (p.r+14) - p.broomBlow * 0.22;
   ctx.save();
   ctx.translate(bx,by);
-  ctx.rotate(p.facing);
+  ctx.rotate(p.facing + wind.dx * p.broomBlow * 0.012);
   ctx.fillStyle = '#8a5a2b';
   ctx.fillRect(-2, -3, 16, 4);
   ctx.fillStyle = '#e3c25c';
@@ -617,6 +732,25 @@ function drawNeighbor(){
   ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=1.4;
   ctx.beginPath(); ctx.arc(0,-4,4,0.15*Math.PI,0.85*Math.PI, true); ctx.stroke();
   ctx.restore();
+}
+
+function drawWeather(){
+  if(weather.type === 'rain'){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(155, 205, 230, .38)';
+    ctx.lineWidth = 1.5;
+    for(let i=0;i<46;i++){
+      const x = (i * 71 + lastTime * 0.16) % (W + 30) - 15;
+      const y = (i * 43 + lastTime * 0.28) % H;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 13); ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.fillStyle = 'rgba(242, 183, 5, .08)';
+    ctx.beginPath(); ctx.arc(W - 50, 55, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawDebris(item){
@@ -705,6 +839,7 @@ function render(){
     shake = Math.max(0, shake-0.5);
   }
   drawTurf();
+  drawWeather();
   leaves.forEach(drawLeaf);
   debris.forEach(drawDebris);
   drawParticles();
@@ -721,15 +856,25 @@ function loop(t){
   lastTime = t;
 
   if(state===STATE.PLAYING){
+    playTime += dt;
+    const nextTier = Math.floor(playTime / 60);
+    if(nextTier > difficultyTier){
+      difficultyTier = nextTier;
+      showBanner(`⚠️ The yard is escalating. Difficulty ${difficultyTier + 1}.`);
+      playTone(300 + difficultyTier * 45, 0.25, 'sawtooth', 0.12, 0, 220);
+    }
     updatePlayer(dt);
     updateLeaves(dt);
     updateParticles(dt);
     updateDebris(dt);
     updateWind(dt);
+    updateWeather(dt);
     updateNeighbor(dt);
     updateDana(dt);
     checkThreshold();
     updateHUD();
+  } else if(state===STATE.DUEL){
+    updateDuel(dt);
   }
   render();
   requestAnimationFrame(loop);
@@ -800,6 +945,7 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
 document.getElementById('pauseBtn').addEventListener('click', pauseGame);
 document.getElementById('resumeBtn').addEventListener('click', resumeGame);
 document.getElementById('menuBtn').addEventListener('click', showMainMenu);
+document.getElementById('duelMashBtn').addEventListener('click', mashDuel);
 
 resetGame();
 renderHighScores('startHighScores');

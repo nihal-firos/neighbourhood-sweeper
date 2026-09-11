@@ -58,6 +58,17 @@
                 <p class="keyHint">Press ESC to resume</p>
             </section>
 
+            <section class="duelOverlay hidden" id="duelOverlay" aria-live="assertive" aria-label="Rake-off minigame">
+                <p class="eyebrow">GARY DEMANDS A</p>
+                <h2 class="title duelTitle">RAKE-OFF!</h2>
+                <p class="duelTimer" id="duelTimer">5.0</p>
+                <div class="duelScores">
+                    <span>YOU <strong id="duelPlayerScore">0</strong></span>
+                    <span>GARY <strong id="duelGaryScore">0</strong></span>
+                </div>
+                <button class="playBtn" id="duelMashBtn">MASH SPACE / TAP!</button>
+            </section>
+
             <section class="overlay hidden" id="gameOverOverlay" aria-label="Game over">
                 <p class="bigmsg" id="goMsg"></p>
                 <div class="statsRow">
