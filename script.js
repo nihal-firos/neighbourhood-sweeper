@@ -679,6 +679,7 @@ function finishRakeDuel(){
   document.getElementById('duelOverlay').classList.add('hidden');
   state = STATE.PLAYING;
   document.title = 'Sweep Duty';
+  threshold = rand(50, 80);
   if(duel.playerScore >= duel.garyScore){
     player.boostTimer = 12;
     showBanner('🏆 YOU WIN! Turbo sweeping for 12 seconds.');

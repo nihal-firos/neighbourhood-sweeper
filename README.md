@@ -2,96 +2,74 @@
 
 
 
-# [Project Name] 🎯
+# SWEEP DUTY 🧹🍂
 
 
 ## Basic Details
-### Team Name: [Name]
+### Team Name: LFX
 
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead:  Mohamed Hafil T - Farook College (Autonomous), Kozhikode
+- Member 2: Nihal K - Farook College (Autonomous), Kozhikode
 
 ### Project Description
-[2-3 lines about what your project does]
+Sweep Duty is a top-down browser game where you sweep leaves off a yard that will never actually be clean, because your neighbor Gary shows up every time you get close and dumps a fresh batch just to spite you. There is no win condition. There was never going to be one.
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+Nobody has ever needed a video game about raking leaves. Nobody asked for a simulation of the specific rage of finishing a chore only to have a neighbor undo it out of pure spite. And yet, here we are.
 
 ### The Solution (that nobody asked for)
-[How are you solving it? Keep it fun!]
+We built an infinite, unwinnable leaf-sweeping simulator. A progress bar tracks how clean the yard is, and the moment it crosses a random threshold (75-99%... or lower now, we tuned it), Gary sprints across the screen dropping leaves everywhere while yelling increasingly unhinged one-liners. Occasionally he challenges you to a rake-off duel. Occasionally his wife Dana shows up to yell at him for you. Eventually, after 6-9 of his visits, the game ends with a deliberately stupid, randomly-chosen ending (restraining orders, forced retirement of your broom, achieving leaf-based enlightenment). You get a score. You get nothing else. That's the point.
 
 ## Technical Details
 ### Technologies/Components Used
 For Software:
-- [Languages used]
-- [Frameworks used]
-- [Libraries used]
-- [Tools used]
+- **Languages:** JavaScript (ES6+), HTML5, CSS3
+- **Frameworks:** None — vanilla JS, no build step
+- **Libraries:** None — all rendering via HTML5 Canvas 2D API, all audio via the native Web Audio API    (procedurally generated music and sound effects, zero external audio files)
+- **Tools:** Google Fonts (Fredoka, Space Mono) via CDN link, browser `localStorage` for high scores and achievements
+- **Hosting:** Static site — deployable on GitHub Pages / Netlify / Vercel with zero configuration
 
 For Hardware:
-- [List main components]
-- [List specifications]
-- [List tools required]
+- None — this is a purely software/browser-based project
 
 ### Implementation
 For Software:
 # Installation
-[commands]
+No installation or dependencies required — it's a static site.
+
+git clone https://github.com/nihal-firos/neighbourhood-sweeper.git
+cd neighbourhood-sweeper
 
 # Run
-[commands]
+Just open `index.html` directly in a browser, or play directly using:
+
+https://neighbourhood-sweeper.vercel.app/
 
 ### Project Documentation
 For Software:
 
 # Screenshots (Add at least 3)
 ![Screenshot1](Add screenshot 1 here with proper name)
-*Add caption explaining what this shows*
+*The title screen — "Grab the Broom" to begin an unwinnable shift.*
 
 ![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
+*Mid-sweep: leaves scattered across the yard, progress bar climbing toward Gary's threshold.*
 
 ![Screenshot3](Add screenshot 3 here with proper name)
-*Add caption explaining what this shows*
+*Gary arriving to "help" — his speech banner and a fresh trail of dumped leaves.*
 
-# Diagrams
-![Workflow](Add your workflow/architecture diagram here)
-*Add caption explaining your workflow*
+![Screenshot4](Add a screenshot of the game over screen here)
+*One of several random, deliberately ridiculous game-over endings.*
 
-For Hardware:
-
-# Schematic & Circuit
-![Circuit](Add your circuit diagram here)
-*Add caption explaining connections*
-
-![Schematic](Add your schematic diagram here)
-*Add caption explaining the schematic*
-
-# Build Photos
-![Components](Add photo of your components here)
-*List out all components shown*
-
-![Build](Add photos of build process here)
-*Explain the build steps*
-
-![Final](Add photo of final product here)
-*Explain the final build*
-
-### Project Demo
-# Video
-[Add your demo video link here]
-*Explain what the video demonstrates*
 
 # Additional Demos
-[Add any extra demo materials/links]
+https://neighbourhood-sweeper.vercel.app/
 
 ## Team Contributions
-- [Name 1]: [Specific contributions]
-- [Name 2]: [Specific contributions]
-- [Name 3]: [Specific contributions]
+- Mohamed Hafil T: Core game loop, canvas rendering, player/Gary mechanics, progress bar and threshold logic
+- Nihal K: Procedural audio (Web Audio SFX and music), UI/HUD design, achievements and high-score system, mobile responsiveness fixes   
 
 ---
 Made with ❤️ at TinkerHub Useless Projects 
