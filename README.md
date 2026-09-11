@@ -51,16 +51,16 @@ https://neighbourhood-sweeper.vercel.app/
 For Software:
 
 # Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
+![Main Menu](ss/main_menu.png)
 *The title screen — "Grab the Broom" to begin an unwinnable shift.*
 
-![Screenshot2](Add screenshot 2 here with proper name)
+![Gameplay](ss/gameplay.png)
 *Mid-sweep: leaves scattered across the yard, progress bar climbing toward Gary's threshold.*
 
-![Screenshot3](Add screenshot 3 here with proper name)
+![One of the main feature](ss/features.png)
 *Gary arriving to "help" — his speech banner and a fresh trail of dumped leaves.*
 
-![Screenshot4](Add a screenshot of the game over screen here)
+![Game Over](ss/game_over.png)
 *One of several random, deliberately ridiculous game-over endings.*
 
 
