@@ -259,7 +259,7 @@ function resetGame(){
   weather = { type:'sun', timer: rand(16, 26) };
   duel = { active:false, time:0, playerScore:0, garyScore:0 };
 
-  const initialCount = 32;
+  const initialCount = 42;
   for(let i=0;i<initialCount;i++) leaves.push(spawnLeaf());
   batchTotal = initialCount;
   threshold = rand(85, 99);
