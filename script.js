@@ -7,13 +7,53 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let W = 800, H = 600;
 
-function resize(){
-  const rect = stage.getBoundingClientRect();
-  W = canvas.width = Math.round(rect.width);
-  H = canvas.height = Math.round(rect.height);
-}
-window.addEventListener('resize', resize);
-resize();
+    let player = null, leaves = [], particles = [], debris = [];
+    let neighbor = { active: false, x: -40, y: -40, path: [] };
+    let dana = { active: false, x: -40, y: -40 };
+    let wind = { dx: 1, active: false };
+    let score = 0, totalSwept = 0, neighborVisits = 0, neighborVisitLimit = 0;
+    let batchTotal = 0, threshold = 0;
+    let comboCount = 0, comboTimer = 0;
+    let shake = 0;
+    let lastTime = 0;
+    let debrisTimer = 0;
+    let idleTimer = 0;
+    let duel = { active: false }, weather = { type: 'sun', timer: 0 };
+    let playTime = 0;
+    let difficultyTier = 0;
+    let garyTouches = 0;
+    let jackpotSweeps = 0;
+    let debrisSwept = 0;
+
+    function rescaleEntities(newW, newH) {
+        if (!W || !H || (newW === W && newH === H)) return;
+        const sx = newW / W, sy = newH / H;
+        leaves.forEach(lf => { lf.x *= sx; lf.y *= sy; });
+        debris.forEach(d => { d.x *= sx; d.y *= sy; });
+        particles.forEach(p => { p.x *= sx; p.y *= sy; });
+        if (player) { player.x *= sx; player.y *= sy; }
+        if (neighbor && neighbor.active) {
+            neighbor.x *= sx; neighbor.y *= sy;
+            neighbor.path.forEach(pt => { pt.x *= sx; pt.y *= sy; });
+        }
+        if (dana && dana.active) { dana.x *= sx; dana.y *= sy; }
+    }
+
+    function resize() {
+        const rect = stage.getBoundingClientRect();
+        const newW = Math.max(1, Math.round(rect.width));
+        const newH = Math.max(1, Math.round(rect.height));
+        rescaleEntities(newW, newH);
+        W = canvas.width = newW;
+        H = canvas.height = newH;
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', resize);
+    }
+    resize();
 
 /* ---------------- Audio (fully procedural, no external files) ---------------- */
 let actx = null, masterGain = null, musicMuted = false;
@@ -110,22 +150,9 @@ document.getElementById('muteBtn').addEventListener('click', ()=>{
 const STATE = { START:'start', PLAYING:'playing', DUEL:'duel', PAUSED:'paused', GAMEOVER:'gameover' };
 let state = STATE.START;
 
-let player, leaves, particles, neighbor, dana, wind, debris;
-let score, totalSwept, neighborVisits, neighborVisitLimit;
-let batchTotal, threshold;
-let comboCount, comboTimer;
-let shake = 0;
-let lastTime = 0;
-let debrisTimer = 0;
-let idleTimer = 0;
-let duel, weather;
-let playTime = 0;
-let difficultyTier = 0;
-let garyTouches = 0;
-let jackpotSweeps = 0;
-let debrisSwept = 0;
-const HIGH_SCORE_KEY = 'sweep-duty-high-scores-v1';
-const ACHIEVEMENT_KEY = 'sweep-duty-achievements-v1';
+    
+    const HIGH_SCORE_KEY = 'sweep-duty-high-scores-v1';
+    const ACHIEVEMENT_KEY = 'sweep-duty-achievements-v1';
 
 const ACHIEVEMENTS = [
   { id:'ten-minute-shift', name:'Ten-Minute Shift', hint:'Sweep for 10 minutes straight.' },
