@@ -262,7 +262,7 @@ function resetGame(){
   const initialCount = 42;
   for(let i=0;i<initialCount;i++) leaves.push(spawnLeaf());
   batchTotal = initialCount;
-  threshold = rand(85, 99);
+  threshold = rand(75, 90);
 
   updateHUD();
 }
@@ -680,7 +680,7 @@ function finishRakeDuel(){
   document.getElementById('duelOverlay').classList.add('hidden');
   state = STATE.PLAYING;
   document.title = 'Sweep Duty';
-  threshold = rand(85, 99);
+  threshold = rand(75, 90);
   if(duel.playerScore >= duel.garyScore){
     player.boostTimer = 12;
     showBanner('🏆 YOU WIN! Turbo sweeping for 12 seconds.');
@@ -736,7 +736,7 @@ function triggerNeighborEvent(){
         dana.x = dana.side > 0 ? -35 : W + 35;
         dana.y = H * 0.42;
     }
-  threshold = rand(85, 99);
+  threshold = rand(75, 90);
   document.title = 'Sweep Duty';
 
   if(neighborVisits >= neighborVisitLimit){
