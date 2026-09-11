@@ -728,13 +728,13 @@ function triggerNeighborEvent(){
   const line = getGaryLine(neighborVisits);
   showBanner(`🍂 Gary is here to "help" — "${line}"`);
   document.title = '😱 Gary incoming!';
-  if(neighborVisits >= 3){
-    dana.active = true;
-    dana.arguing = false;
-    dana.side = fromLeft ? 1 : -1;
-    dana.x = dana.side > 0 ? -35 : W + 35;
-    dana.y = H * 0.42;
-  }
+    if (neighborVisits >= 3 && neighborVisits < neighborVisitLimit) {
+        dana.active = true;
+        dana.arguing = false;
+        dana.side = fromLeft ? 1 : -1;
+        dana.x = dana.side > 0 ? -35 : W + 35;
+        dana.y = H * 0.42;
+    }
   threshold = rand(50, 80);
   document.title = 'Sweep Duty';
 
@@ -1058,6 +1058,7 @@ function triggerGameOver(){
   document.title = 'Sweep Duty — Gary wins';
   stopMusic();
   playGameOver();
+  dana.active = false;
   document.getElementById('goMsg').textContent = ENDINGS[Math.floor(rand(0,ENDINGS.length))];
   document.getElementById('goScore').textContent = score;
   document.getElementById('goSwept').textContent = totalSwept;
